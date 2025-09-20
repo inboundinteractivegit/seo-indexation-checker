@@ -1,0 +1,34 @@
+{
+  "websites": [
+    {
+      "name": "Austin Fence",
+      "sitemap_url": "https://austinfence.net/sitemap_index.xml",
+      "exclude_sitemaps": [
+        "local-sitemap.xml"
+      ],
+      "enabled": true,
+      "gsc_available": true,
+      "description": "Austin Fence with GSC access"
+    },
+    {
+      "name": "Abercrombie Jewelry",
+      "sitemap_urls": [
+        "https://abercrombiejewelry.com/post-sitemap.xml",
+        "https://abercrombiejewelry.com/page-sitemap.xml"
+      ],
+      "enabled": true,
+      "gsc_available": false,
+      "description": "Abercrombie Jewelry - using search fallback"
+    },
+    {
+      "name": "Austin Fence Company",
+      "sitemap_urls": [
+        "https://austinfencecompany.org/post-sitemap.xml",
+        "https://austinfencecompany.org/page-sitemap.xml"
+      ],
+      "enabled": true,
+      "gsc_available": false,
+      "description": "Austin Fence Company - using search fallback"
+    }
+  ]
+}
