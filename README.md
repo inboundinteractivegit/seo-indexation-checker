@@ -1,4 +1,5 @@
-# 🔍 SEO Indexation Checker
+# 🚀 II Indexation Checker
+## Inbound Interactive's Professional SEO Indexation Monitoring Tool
 
 A powerful Python tool for monitoring website indexation status using Google Search Console API with intelligent fallbacks.
 
@@ -18,7 +19,7 @@ A powerful Python tool for monitoring website indexation status using Google Sea
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-company/seo-indexation-checker.git
+git clone https://github.com/inboundinteractivegit/seo-indexation-checker.git
 cd seo-indexation-checker
 
 # Install dependencies
@@ -53,6 +54,16 @@ Edit `config/websites.json`:
 
 ### 4. Run Indexation Check
 
+**Option A: GUI Tool (Recommended)**
+```bash
+# Launch the user-friendly interface
+python ii_indexation_gui.py
+
+# Or double-click (Windows)
+launch_ii_indexation.bat
+```
+
+**Option B: Command Line**
 ```bash
 # Check all websites
 python check_indexation.py
@@ -144,4 +155,4 @@ Your Website:
 
 ---
 
-**Made with ❤️ by [Your Company] SEO Team**
+**Made with ❤️ by Inbound Interactive SEO Team**

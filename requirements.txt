@@ -6,6 +6,9 @@ google-auth>=2.16.0
 google-auth-oauthlib>=1.0.0
 google-auth-httplib2>=0.2.0
 
+# GUI dependencies (tkinter is included with Python)
+# No additional GUI dependencies needed
+
 # Development dependencies (optional)
 pytest>=7.0.0
 black>=22.0.0
