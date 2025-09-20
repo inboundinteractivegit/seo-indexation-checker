@@ -1,0 +1,32 @@
+{
+  "websites": [
+    {
+      "name": "Example Website",
+      "sitemap_url": "https://example.com/sitemap_index.xml",
+      "exclude_sitemaps": [
+        "local-sitemap.xml",
+        "author-sitemap.xml"
+      ],
+      "enabled": true,
+      "gsc_available": true,
+      "description": "Main company website with GSC access"
+    },
+    {
+      "name": "Blog Site",
+      "sitemap_urls": [
+        "https://blog.example.com/post-sitemap.xml",
+        "https://blog.example.com/page-sitemap.xml"
+      ],
+      "enabled": true,
+      "gsc_available": false,
+      "description": "Company blog - using fallback method"
+    },
+    {
+      "name": "E-commerce Store",
+      "sitemap_url": "https://store.example.com/sitemap.xml",
+      "enabled": false,
+      "gsc_available": true,
+      "description": "Disabled temporarily for maintenance"
+    }
+  ]
+}
