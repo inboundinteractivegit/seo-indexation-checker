@@ -15,8 +15,9 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 import os
 
-# Import our Search Console checker
+# Import our checkers
 from search_console_checker import SearchConsoleChecker
+from indexed_api_checker import IndexedAPIChecker
 
 def fetch_urls_from_sitemap_index(sitemap_index_url, exclude_sitemaps=None):
     """
@@ -95,25 +96,47 @@ def check_indexation_google_search(url):
     """
     Check if a URL is indexed using Google search (fallback method)
     """
+    import random
+
+    # Rotate user agents to avoid detection
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ]
+
     try:
         search_query = f"site:{url}"
         search_url = f"https://www.google.com/search?q={quote_plus(search_query)}"
 
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': random.choice(user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
 
-        response = requests.get(search_url, headers=headers)
+        response = requests.get(search_url, headers=headers, timeout=10)
 
         if response.status_code == 200:
             if "did not match any documents" in response.text or "No results found" in response.text:
                 return "NOT INDEXED", "Google Search"
             else:
                 return "INDEXED", "Google Search"
+        elif response.status_code == 429:
+            print(f"    Rate limited for {url} - need longer delays")
+            return "RATE LIMITED", f"Google Search (HTTP {response.status_code})"
         else:
+            print(f"    HTTP {response.status_code} for {url}")
             return "ERROR", f"Google Search (HTTP {response.status_code})"
 
     except Exception as e:
+        print(f"    Exception for {url}: {str(e)}")
         return "ERROR", f"Google Search ({str(e)})"
 
 def normalize_website_url(url):
@@ -130,15 +153,24 @@ def get_base_domain(url):
     parsed = urlparse(url)
     return parsed.netloc
 
-def check_website_indexation(website_config):
+def check_website_indexation(website_config, stop_event=None):
     """
     Check indexation for a single website using best available method
+
+    Args:
+        website_config: Configuration dictionary for the website
+        stop_event: Threading event to signal when to stop checking
     """
     print(f"\n=== Checking: {website_config['name']} ===")
 
-    # Initialize Search Console checker
-    gsc_checker = SearchConsoleChecker('search_console_credentials.json')
+    # Initialize checkers
+    gsc_checker = SearchConsoleChecker('config/google_credentials.json')
     gsc_available = gsc_checker.service is not None
+
+    # Initialize IndexedAPI checker if configured
+    indexed_api_key = website_config.get('indexed_api_key', None)
+    indexed_api_checker = IndexedAPIChecker(indexed_api_key) if indexed_api_key else None
+    indexed_api_available = indexed_api_checker is not None
 
     # Get available GSC properties
     gsc_properties = []
@@ -168,9 +200,20 @@ def check_website_indexation(website_config):
         print(f"No URLs found for {website_config['name']}")
         return []
 
+    # Check for stop signal before processing
+    if stop_event and stop_event.is_set():
+        print("[STOP] Check stopped by user")
+        return []
+
     print(f"Found {len(all_urls)} URLs to check")
 
-    # Determine which method to use
+    # Apply URL limit for reasonable processing time
+    max_urls = website_config.get('max_urls', 100)  # Default limit of 100 URLs
+    if len(all_urls) > max_urls:
+        print(f"[LIMIT] Limiting to first {max_urls} URLs (from {len(all_urls)} total)")
+        all_urls = all_urls[:max_urls]
+
+    # Determine which method to use (Priority: GSC > IndexedAPI > Google Search)
     website_domain = get_base_domain(all_urls[0]) if all_urls else ""
     gsc_property_url = None
 
@@ -182,37 +225,96 @@ def check_website_indexation(website_config):
                 gsc_property_url = prop_url
                 break
 
-    if gsc_property_url:
-        print(f"[INFO] Using Google Search Console API for {website_config['name']}")
+    # Choose checking method based on availability and configuration
+    preferred_method = website_config.get('checking_method', 'auto')  # auto, gsc, indexed_api, google_search
+
+    if preferred_method == 'gsc' and gsc_property_url:
+        print(f"[INFO] Using Google Search Console API (preferred) for {website_config['name']}")
         print(f"[INFO] GSC Property: {gsc_property_url}")
+        results = gsc_checker.check_indexation_status(gsc_property_url, all_urls, stop_event=stop_event)
 
-        # Use GSC API
-        results = gsc_checker.check_indexation_status(gsc_property_url, all_urls)
+    elif preferred_method == 'indexed_api' and indexed_api_available:
+        print(f"[INFO] Using IndexedAPI (preferred) for {website_config['name']}")
+        results = indexed_api_checker.check_indexation_status(all_urls, stop_event=stop_event)
 
-    else:
-        print(f"[INFO] Using Google Search fallback for {website_config['name']}")
-        print(f"[WARN] For better accuracy, add this site to Search Console and grant access to the service account")
-
-        # Use Google search fallback
+    elif preferred_method == 'google_search':
+        print(f"[INFO] Using Google Search (preferred) for {website_config['name']}")
         results = []
         for i, url in enumerate(all_urls, 1):
+            if stop_event and stop_event.is_set():
+                print(f"[STOP] Check stopped by user after processing {i-1}/{len(all_urls)} URLs")
+                break
             print(f"Checking {i}/{len(all_urls)}: {url}")
-
             status, method = check_indexation_google_search(url)
-
             results.append({
                 'url': url,
                 'status': status,
                 'method': method,
                 'check_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             })
-
-            # Rate limiting for Google search
-            if i % 10 == 0:
+            if i % 20 == 0:
                 print(f"  Processed {i} URLs, taking a short break...")
-                time.sleep(5)
-            else:
                 time.sleep(2)
+            else:
+                time.sleep(0.5)
+
+    else:
+        # Auto mode - use best available method with fallback
+        results = []
+
+        # Try GSC first if available
+        if gsc_property_url:
+            print(f"[INFO] Using Google Search Console API (auto) for {website_config['name']}")
+            print(f"[INFO] GSC Property: {gsc_property_url}")
+            results = gsc_checker.check_indexation_status(gsc_property_url, all_urls, stop_event=stop_event)
+
+            # Check if GSC actually worked (returned non-empty results)
+            if not results:
+                print("[WARN] GSC returned no results, falling back to next method")
+
+        # If GSC failed or not available, try IndexedAPI
+        if not results and indexed_api_available:
+            print(f"[INFO] Using IndexedAPI (fallback) for {website_config['name']}")
+            print(f"[INFO] Fast and reliable bulk checking")
+            results = indexed_api_checker.check_indexation_status(all_urls, stop_event=stop_event)
+
+            # Check if IndexedAPI actually worked
+            if not results:
+                print("[WARN] IndexedAPI returned no results, falling back to Google Search")
+
+        # If both GSC and IndexedAPI failed, use Google Search fallback
+        if not results:
+            print(f"[INFO] Using Google Search fallback for {website_config['name']}")
+            print(f"[WARN] Primary methods failed, using Google Search as last resort")
+
+            # Use Google search fallback
+            results = []
+            for i, url in enumerate(all_urls, 1):
+                # Check for stop signal
+                if stop_event and stop_event.is_set():
+                    print(f"[STOP] Check stopped by user after processing {i-1}/{len(all_urls)} URLs")
+                    break
+
+                print(f"Checking {i}/{len(all_urls)}: {url}")
+
+                status, method = check_indexation_google_search(url)
+
+                results.append({
+                    'url': url,
+                    'status': status,
+                    'method': method,
+                    'check_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                })
+
+                # Adaptive rate limiting for Google search
+                if 'RATE LIMITED' in status:
+                    print(f"  Rate limited! Taking longer break...")
+                    time.sleep(10)  # Longer delay on rate limit
+                elif i % 10 == 0:
+                    print(f"  Processed {i} URLs, taking a break...")
+                    time.sleep(3)  # Longer base delay
+                else:
+                    time.sleep(1.5)  # Increased base delay to avoid rate limits
 
     return results
 

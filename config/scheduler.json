@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "interval_hours": 24,
+  "run_time": "09:00",
+  "enabled_websites": [],
+  "last_run": null,
+  "upload_to_sheets": true,
+  "email_notifications": false,
+  "email_address": ""
+}

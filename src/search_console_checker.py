@@ -29,13 +29,25 @@ class SearchConsoleChecker:
             # Define the scope
             scopes = ['https://www.googleapis.com/auth/webmasters.readonly']
 
-            # Load credentials
+            # Load credentials and explicitly set project
             credentials = Credentials.from_service_account_file(
                 self.credentials_file, scopes=scopes
             )
 
-            # Build the service
-            self.service = build('searchconsole', 'v1', credentials=credentials)
+            # Load the credentials file to get project ID
+            with open(self.credentials_file, 'r') as f:
+                creds_data = json.load(f)
+            project_id = creds_data.get('project_id')
+
+            print(f"[INFO] Using project ID: {project_id}")
+
+            # Build the service with explicit project
+            self.service = build('searchconsole', 'v1',
+                               credentials=credentials,
+                               cache_discovery=False)  # Disable caching
+
+            # Store project ID for reference
+            self.project_id = project_id
             print("[OK] Search Console API client initialized successfully")
             return True
 
@@ -67,7 +79,7 @@ class SearchConsoleChecker:
             print(f"[ERROR] Error getting properties: {e}")
             return []
 
-    def check_indexation_status(self, site_url, urls_to_check, days_back=90):
+    def check_indexation_status(self, site_url, urls_to_check, days_back=90, stop_event=None):
         """
         Check indexation status for URLs using Search Console data
 
@@ -75,6 +87,7 @@ class SearchConsoleChecker:
             site_url: The property URL (e.g., 'https://example.com/')
             urls_to_check: List of URLs to check
             days_back: How many days back to check (default 90)
+            stop_event: Threading event to signal when to stop checking
         """
         if not self.service:
             print("[ERROR] Search Console client not initialized")
@@ -113,6 +126,11 @@ class SearchConsoleChecker:
 
             # Check each URL
             for url in urls_to_check:
+                # Check for stop signal
+                if stop_event and stop_event.is_set():
+                    print("[STOP] GSC check stopped by user")
+                    break
+
                 # Clean URL for comparison
                 clean_url = url.strip()
 

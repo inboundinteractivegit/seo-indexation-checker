@@ -8,7 +8,7 @@ echo ================================
 echo.
 echo Starting beautiful GUI interface...
 echo.
-python ii_indexation_gui.py
+python ii_indexation_gui_simple.py
 if errorlevel 1 (
     echo.
     echo Error: Failed to start the application.

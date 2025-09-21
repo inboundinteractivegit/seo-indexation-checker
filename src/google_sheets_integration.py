@@ -24,7 +24,7 @@ class GoogleSheetsIntegration:
         5. Download JSON key file
         6. Share your Google Sheet with the service account email
         """
-        self.credentials_file = credentials_file or 'google_credentials.json'
+        self.credentials_file = credentials_file or 'config/google_credentials.json'
         self.client = None
         self.setup_client()
 
@@ -60,6 +60,39 @@ class GoogleSheetsIntegration:
 
         except Exception as e:
             print(f"[ERROR] Error setting up Google Sheets client: {e}")
+            return False
+
+    def test_sheet_access(self, spreadsheet_id, worksheet_name=None):
+        """Test access to a specific spreadsheet and worksheet"""
+        try:
+            if not self.client:
+                print("[ERROR] Google Sheets client not initialized")
+                return False
+
+            # Try to open the spreadsheet by ID
+            spreadsheet = self.client.open_by_key(spreadsheet_id)
+            print(f"[OK] Successfully accessed spreadsheet: {spreadsheet.title}")
+
+            # If worksheet name is provided, test access to specific worksheet
+            if worksheet_name:
+                try:
+                    worksheet = spreadsheet.worksheet(worksheet_name)
+                    print(f"[OK] Successfully accessed worksheet: {worksheet_name}")
+                except gspread.WorksheetNotFound:
+                    print(f"[WARN] Worksheet '{worksheet_name}' not found, but spreadsheet is accessible")
+                    # This is still considered success - we can create the worksheet later
+                    return True
+
+            return True
+
+        except gspread.SpreadsheetNotFound:
+            print(f"[ERROR] Spreadsheet with ID '{spreadsheet_id}' not found or not accessible")
+            return False
+        except gspread.exceptions.APIError as e:
+            print(f"[ERROR] Google Sheets API error: {e}")
+            return False
+        except Exception as e:
+            print(f"[ERROR] Error testing sheet access: {e}")
             return False
 
     def get_or_create_sheet(self, sheet_name, website_name):
